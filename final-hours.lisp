@@ -14,9 +14,11 @@
 
 (defparameter *player-missiles* nil)
 (defparameter *player-missiles-explosion* nil)
+(defparameter *player-missile-count* 0)
+(defparameter *player-score* 0)
 
 (defparameter *enemy-missiles* nil)
-(defparameter *enemy-missile-count* 20)
+(defparameter *enemy-missile-count* 10)
 (defparameter *enemies* nil)
 
 (defparameter *level* 1)
@@ -56,6 +58,7 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; CLASSES ;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 (defstruct player-missile
   (xt 0)
@@ -198,6 +201,7 @@
 (defun play-sound-missile ()
   (play-sound (+ (random 3) 6)))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;; LEVEL ;;;;;;;;;;;;;;;;;;;;;;;;
 
 
@@ -211,6 +215,18 @@
 
 (defun draw-mountains ()
   (draw-polygon '((0 520) (20 520) (70 540) (80 540) (160 480) (220 520) (280 520) (330 530) (340 530) (360 480) (380 520) (400 520) (480 460) (520 500) (540 500) (580 500) (600 540) (620 540) (680 500) (760 500) (800 520) (800 600) (0 600)) 0 0 0))
+
+
+(defun draw-game-ui ()
+  (draw-text "Damage: " 
+	     20 580 255 255 255 *ttf-font-small*)
+
+  (draw-text (format nil "Score: ~a" *player-score*) 
+	     380 580 255 255 255 *ttf-font-small*)
+
+  (draw-text (format nil "Missiles: ~a" *player-missile-count*) 
+	     700 580 255 255 255 *ttf-font-small*))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;; ENEMY ;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -292,7 +308,9 @@
 		   (create-explosion (player-missile-xt m) (player-missile-yt m))
 		   (play-sound-explosion))
 	    (progn (setf (player-missile-x1 m) (- (player-missile-x1 m) (player-missile-dx m)))
-		   (setf (player-missile-y1 m) (+ (player-missile-y1 m) (player-missile-dy m)))))))
+		   (setf (player-missile-y1 m) (+ (player-missile-y1 m) (player-missile-dy m))))))
+
+  (update-player-missiles-explosion))
 
 
 ;;;; UPDATE-PLAYER-MISSILES-EXPLOSION function
@@ -342,22 +360,22 @@
 ;;;; FIRE-PRIMARY function
 
 (defun fire-primary (x y)
-  (let ((d (- x (/ *game-width* 2)))
-	(dx 0))
-    ;(format t "Firing Primary Missiles to: [~a, ~a]~%" x y)
+  (unless (zerop *player-missile-count*)
+    (let ((d (- x (/ *game-width* 2)))
+	  (dx 0))
+      (if (zerop d)
+	  (setf dx 0)
+	  (setf dx (* (/ 1 (/ (- y *game-height*) d)) 4)))
+      
+      (push (make-player-missile
+	     :xt x :yt y
+	     :x0 (/ *game-width* 2) :y0 (- *game-height* 25)	
+	     :x1 (/ *game-width* 2) :y1 (- *game-height* 25)
+	     :dx dx :dy -4 :active 1)
+	    *player-missiles*))
 
-    (if (zerop d)
-	(setf dx 0)
-	(setf dx (* (/ 1 (/ (- y *game-height*) d)) 4)))
-
-    (push (make-player-missile
-	   :xt x :yt y
-	   :x0 (/ *game-width* 2) :y0 (- *game-height* 25)	
-	   :x1 (/ *game-width* 2) :y1 (- *game-height* 25)
-	   :dx dx :dy -4 :active 1)
-	  *player-missiles*))
-
-  (play-sound-missile))
+    (play-sound-missile)
+    (setf *player-missile-count* (decf *player-missile-count*))))
 
 
 ;;;; CREATE-EXPLOSION function
@@ -371,24 +389,69 @@
   (setf *game-clock* (incf *game-clock*)))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;; SCORING ;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;;; UPDATE-SCORE function
+
+(defun update-score (unit)
+  (cond ((equalp unit 'missile)
+	 (setf *player-score* (+ *player-score* 25)))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;; SCREENS ;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;; DISPLAY-END-GAME function
+
+(defun display-end-game ()
+  ;(sdl:draw-surface-at-* (sdl:load-image *gfx-game-over*) 0 0)
+
+  (draw-text "FINAL HOURS" 180 20 255 255 0 *ttf-font-huge*)
+
+  (draw-text "Press SPACE to Continue..." 120 560 255 255 255))
 
 
 ;;;; DISPLAY-MENU function
 
 (defun display-menu ()
-  (draw-text "Main Menu" 20 100 255 255 255))
+  (draw-text "FINAL HOURS" 180 20 255 255 0 *ttf-font-huge*)
+  (draw-text "Press SPACE to Start..." 120 560 255 255 255))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; GAME STATE ;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;; STATE-IN-PLAY function
+
+(defun state-in-play ()
+  (update-game-clock)
+  (display-level)
+  (draw-player)
+  (update-player-missiles)
+  (update-enemy-missiles)
+  (draw-player-missiles)
+  (draw-player-missiles-explosion)
+  (draw-enemy-missiles)
+  (draw-mountains)
+  (draw-game-ui)
+  (create-enemies))
+
+
+;;;; CONTINUE-OPTION function
+
+(defun continue-option ()
+  (cond ((zerop *game-state*) (change-game-state))
+	((= *game-state* 2) (change-game-state))
+	(t ())))
 
 
 ;;;; CHANGE-GAME-STATE function
 
 (defun change-game-state ()
-  (cond ((zerop *game-state*) ())
+  (cond ((zerop *game-state*) (progn (reset-game)
+				     (setf *game-state* 1)))
+	((= *game-state* 1) (setf *game-state* 2))
+	((= *game-state* 2) (setf *game-state* 0))
 	(t ())))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;; THE GAME ;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -398,26 +461,31 @@
 (defun render ()
   (update-swank)
   (sdl:clear-display sdl:*black*)
-  (update-game-clock)
-  (display-level)
-  (draw-player)
-  (update-player-missiles)
-  (update-player-missiles-explosion)
-  (update-enemy-missiles)
-  (draw-player-missiles)
-  (draw-player-missiles-explosion)
-  (draw-enemy-missiles)
-  (draw-mountains)
-  (create-enemies)
-  ;(display-menu)
+
+  (cond ((= *game-state* 1) (state-in-play))
+
+	((= *game-state* 2) (display-end-game))
+
+	(t (display-menu)))
+
   (sdl:update-display))
+
+
+;;;; NEW-LEVEL function
+
+(defun new-level ()
+  (create-enemies-attack-schedule)
+  (setf *game-clock* 0)
+  (setf *player-missile-count* (+ *player-missile-count* 30)))
 
 
 ;;;; RESET-GAME function
 
 (defun reset-game ()
   (create-enemies-attack-schedule)
-  (setf *game-clock* 0))
+  (setf *game-clock* 0)
+  (setf *player-missile-count* 50)
+  (setf *player-score* 0))
 
 ;;;; INITIALIZE-GAME function
 
@@ -504,8 +572,9 @@
 		   t)
       (:key-down-event (:key key)
 		       (case key
-			 (:sdl-key-e (create-enemy-missiles))
-			 ;(:sdl-key-space (continue-option))
+			 (:sdl-key-q (if (= *game-state* 1)
+					 (change-game-state)))
+			 (:sdl-key-space (continue-option))
 			 (:sdl-key-escape (sdl:push-quit-event))))
       (:key-up-event (:key key)
 		     (case key))
