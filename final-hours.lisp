@@ -31,6 +31,7 @@
 ;;;; Sound Params
 (defparameter *mixer-opened* nil)
 (defparameter *music* nil)
+(defparameter *music-intro* nil)
 (defparameter *soundfx* nil)
 
 ;;;; GFX Params
@@ -534,10 +535,23 @@
 ;;;; CHANGE-GAME-STATE function
 
 (defun change-game-state ()
-  (cond ((zerop *game-state*) (progn (reset-game)
-				     (setf *game-state* 1)))
-	((= *game-state* 1) (setf *game-state* 2))
+  (cond ((zerop *game-state*) 
+	 (progn (reset-game)
+		(when (sdl-mixer:music-playing-p)
+		  (sdl-mixer:Pause-Music)
+		  (sdl-mixer:Halt-Music))
+		(sdl-mixer:play-music *music* :loop t)
+		(setf *game-state* 1)))
+
+	((= *game-state* 1) 
+	 (progn (when (sdl-mixer:music-playing-p)
+		  (sdl-mixer:Pause-Music)
+		  (sdl-mixer:Halt-Music))
+		(sdl-mixer:play-music *music-intro* :loop t)
+		(setf *game-state* 2)))
+	
 	((= *game-state* 2) (setf *game-state* 0))
+	
 	(t ())))
 
 ;;;;;;;;;;;;;;;;;;;;;;;; THE GAME ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -597,6 +611,8 @@
     (setf (aref *soundfx* 6) (sdl-mixer:load-sample (sdl:create-path "missile_1.ogg" *audio-root*)))
     (setf (aref *soundfx* 7) (sdl-mixer:load-sample (sdl:create-path "missile_2.ogg" *audio-root*)))
     (setf (aref *soundfx* 8) (sdl-mixer:load-sample (sdl:create-path "missile_3.ogg" *audio-root*)))
+    (setf *music* (sdl-mixer:load-music (sdl:create-path "siren_1.ogg" *audio-root*)))
+    (setf *music-intro* (sdl-mixer:load-music (sdl:create-path "heart_1.ogg" *audio-root*)))
     (sample-finished-action)
     (sdl-mixer:allocate-channels 16)))
 
@@ -613,6 +629,20 @@
 ;;;; CLEAN-UP function
 
 (defun clean-up ()
+  (when *music*
+    (when (sdl-mixer:music-playing-p)
+      (sdl-mixer:Pause-Music)
+      (sdl-mixer:Halt-Music))
+    (sdl:Free *music*)
+    (setf *music* nil))
+
+  (when *music-intro*
+    (when (sdl-mixer:music-playing-p)
+      (sdl-mixer:Pause-Music)
+      (sdl-mixer:Halt-Music))
+    (sdl:Free *music-intro*)
+    (setf *music-intro* nil))
+
   (when (sdl-mixer:sample-playing-p nil)
     (sdl-mixer:pause-sample t)
     (sdl-mixer:Halt-sample :channel t))
@@ -639,6 +669,8 @@
     (setf (sdl:frame-rate) 60)
 
     (setup-audio)
+
+    (sdl-mixer:play-music *music-intro* :loop t)
 
     (unless (sdl:initialise-default-font *terminus-ttf-18*)
       (error "FONT-EXAMPLE: Cannot initialize the default font."))
