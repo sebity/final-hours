@@ -227,7 +227,7 @@
 	     (draw-text (format nil "Wave ~a" *wave*)
 			385 320 255 255 255 *ttf-font-Large*)))
 
-  (draw-text "Damage: " 
+  (draw-text (format nil "Damage: ~a%" *damage*) 
 	     20 580 255 255 255 *ttf-font-small*)
 
   (draw-text (format nil "Score: ~a" *player-score*) 
@@ -295,7 +295,8 @@
 (defun update-enemy-missiles-explosion ()
   (loop for e in *enemy-missiles-explosion*
      do (if (>= (missile-explosion-r e) (missile-explosion-rt e))
-	    (setf *enemy-missiles-explosion* (remove e *enemy-missiles-explosion*))
+	    (progn (setf *enemy-missiles-explosion* (remove e *enemy-missiles-explosion*))
+		   (setf *damage* (+ *damage* (+ (random 5) 20))))
 	    (progn (setf (missile-explosion-r e) (+ (missile-explosion-r e) (/ 1 2)))
 		   (destroy-enemy-missiles (missile-explosion-x e) (missile-explosion-y e)
 					   (missile-explosion-r e))))))
@@ -436,6 +437,10 @@
 	      (new-level)
 	      (new-wave)))))
 
+(defun check-damage-level ()
+  (if (>= *damage* 100)
+      (change-game-state)))
+
 	   
 ;;;; NEW-LEVEL function
 
@@ -444,6 +449,9 @@
   (create-enemies-attack-schedule)
   (setf *game-clock* 0)
   (setf *wave* 1)
+  (setf *damage* (- *damage* 20))
+  (if (< *damage* 0)
+      (setf *damage* 0))
   (setf *player-missile-count* (+ *player-missile-count* 30))
   (setf *level* (incf *level*)))
 
@@ -454,8 +462,10 @@
   (setf *game-clock* 0)
   (create-enemies-attack-schedule)
   (setf *wave* (incf *wave*))
+  (setf *damage* (- *damage* 10))
+  (if (< *damage* 0)
+      (setf *damage* 0))
   (setf *player-missile-count* (+ *player-missile-count* 15)))
-)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; SCORING ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -475,16 +485,21 @@
 (defun display-end-game ()
   ;(sdl:draw-surface-at-* (sdl:load-image *gfx-game-over*) 0 0)
 
-  (draw-text "FINAL HOURS" 180 20 255 255 0 *ttf-font-huge*)
+  (draw-text "FINAL HOURS" 320 20 255 255 0 *ttf-font-huge*)
 
-  (draw-text "Press SPACE to Continue..." 120 560 255 255 255))
+  (draw-text "GAME OVER!" 320 130 255 255 255 *ttf-font-huge*)
+
+  (draw-text (format nil "YOUR SCORE IS ~a" *player-score*) 
+			     260 250 255 0 0 *ttf-font-huge*)
+
+  (draw-text "Press SPACE to Continue..." 270 560 255 255 255))
 
 
 ;;;; DISPLAY-MENU function
 
 (defun display-menu ()
-  (draw-text "FINAL HOURS" 180 20 255 255 0 *ttf-font-huge*)
-  (draw-text "Press SPACE to Start..." 120 560 255 255 255))
+  (draw-text "FINAL HOURS" 320 20 255 255 0 *ttf-font-huge*)
+  (draw-text "Press SPACE to Start..." 270 560 255 255 255))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; GAME STATE ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -504,6 +519,7 @@
   (draw-mountains)
   (draw-game-ui)
   (check-end-of-wave)
+  (check-damage-level)
   (create-enemies))
 
 
@@ -548,13 +564,15 @@
   (setf *player-missiles* nil)
   (setf *player-missiles-explosion* nil)
   (setf *enemy-missiles* nil)
+  (setf *enemy-missiles-explosion* nil)
   (setf *enemies* nil)
   (create-enemies-attack-schedule)
   (setf *game-clock* 0)
   (setf *player-missile-count* 30)
   (setf *player-score* 0)
   (setf *level* 1)
-  (setf *wave* 1))
+  (setf *wave* 1)
+  (setf *damage* 0))
 
 
 ;;;; INITIALIZE-GAME function
