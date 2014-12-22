@@ -18,10 +18,12 @@
 (defparameter *player-score* 0)
 
 (defparameter *enemy-missiles* nil)
+(defparameter *enemy-missiles-explosion* nil)
 (defparameter *enemy-missile-count* 10)
 (defparameter *enemies* nil)
 
 (defparameter *level* 1)
+(defparameter *wave* 1)
 
 (defparameter *game-clock* 0)
 
@@ -218,6 +220,12 @@
 
 
 (defun draw-game-ui ()
+  (if (<= *game-clock* (* 60 2))
+      (progn (draw-text (format nil "Level ~a" *level*)
+			380 280 255 255 255 *ttf-font-Large*)
+	     (draw-text (format nil "Wave ~a" *wave*)
+			385 320 255 255 255 *ttf-font-Large*)))
+
   (draw-text "Damage: " 
 	     20 580 255 255 255 *ttf-font-small*)
 
@@ -273,10 +281,23 @@
   (loop for m in *enemy-missiles*
      do (if (>= (enemy-missile-y1 m) (enemy-missile-yt m))
 	    (progn (setf *enemy-missiles* (remove m *enemy-missiles*))
-		   (create-explosion (enemy-missile-xt m) (enemy-missile-yt m))
+		   (create-enemy-explosion (enemy-missile-xt m) (enemy-missile-yt m))
 		   (play-sound-explosion))
 	    (progn (setf (enemy-missile-x1 m) (+ (enemy-missile-x1 m) (enemy-missile-dx m)))
-		   (setf (enemy-missile-y1 m) (+ (enemy-missile-y1 m) (enemy-missile-dy m)))))))
+		   (setf (enemy-missile-y1 m) (+ (enemy-missile-y1 m) (enemy-missile-dy m))))))
+
+  (update-enemy-missiles-explosion))
+
+
+;;;; UPDATE-PLAYER-MISSILES-EXPLOSION function
+
+(defun update-enemy-missiles-explosion ()
+  (loop for e in *enemy-missiles-explosion*
+     do (if (>= (missile-explosion-r e) (missile-explosion-rt e))
+	    (setf *enemy-missiles-explosion* (remove e *enemy-missiles-explosion*))
+	    (progn (setf (missile-explosion-r e) (+ (missile-explosion-r e) (/ 1 2)))
+		   (destroy-enemy-missiles (missile-explosion-x e) (missile-explosion-y e)
+					   (missile-explosion-r e))))))
 
 
 ;;;; DRAW-ENEMY-MISSILES function
@@ -288,6 +309,21 @@
 		     150 0 0)
 		 (draw-circle-filled (round (enemy-missile-x1 m)) (round (enemy-missile-y1 m))
 				     1 255 255 255))))
+
+
+;;;; DRAW-PLAYER-MISSILES-EXPLOSION function
+
+(defun draw-enemy-missiles-explosion ()
+  (loop for e in *enemy-missiles-explosion*
+     do (draw-circle-filled (missile-explosion-x e) (missile-explosion-y e)
+			    (round (missile-explosion-r e)) 255 0 0)))
+
+
+;;;; CREATE-EXPLOSION function
+
+(defun create-enemy-explosion (x y)
+  (push (make-missile-explosion
+	 :x x :y y :r 1 :rt 40 :dr 1 :active 1) *enemy-missiles-explosion*))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; PLAYER ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -334,7 +370,8 @@
 	    (progn (setf *enemy-missiles* (remove m *enemy-missiles*))
 		   (create-explosion (round (enemy-missile-x1 m)) 
 				     (round (enemy-missile-y1 m)))
-		   (play-sound-explosion)))))
+		   (play-sound-explosion)
+		   (update-score 'missile)))))
 		  
 	      
 
@@ -384,9 +421,40 @@
   (push (make-missile-explosion
 	 :x x :y y :r 1 :rt 40 :dr 1 :active 1) *player-missiles-explosion*))
 
+;;;;;;;;;;;;;;;;;;;;;;;; IN GAME ;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 (defun update-game-clock ()
   (setf *game-clock* (incf *game-clock*)))
+
+
+(defun check-end-of-wave ()
+  (if (> *game-clock* (* 60 70))
+      (if (and (eql *enemy-missiles-explosion* nil) (eql *enemy-missiles* nil))
+	  (if (= *wave* 3)
+	      (new-level)
+	      (new-wave)))))
+
+	   
+;;;; NEW-LEVEL function
+
+(defun new-level ()
+  (setf *player-score* (+ *player-score* (* 5 *player-missile-count*)))
+  (create-enemies-attack-schedule)
+  (setf *game-clock* 0)
+  (setf *wave* 1)
+  (setf *player-missile-count* (+ *player-missile-count* 30))
+  (setf *level* (incf *level*)))
+
+
+;;;; NEW-WAVE function
+
+(defun new-wave ()
+  (setf *game-clock* 0)
+  (create-enemies-attack-schedule)
+  (setf *wave* (incf *wave*))
+  (setf *player-missile-count* (+ *player-missile-count* 15)))
+)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; SCORING ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -431,8 +499,10 @@
   (draw-player-missiles)
   (draw-player-missiles-explosion)
   (draw-enemy-missiles)
+  (draw-enemy-missiles-explosion)
   (draw-mountains)
   (draw-game-ui)
+  (check-end-of-wave)
   (create-enemies))
 
 
@@ -471,30 +541,25 @@
   (sdl:update-display))
 
 
-;;;; NEW-LEVEL function
-
-(defun new-level ()
-  (create-enemies-attack-schedule)
-  (setf *game-clock* 0)
-  (setf *player-missile-count* (+ *player-missile-count* 30)))
-
-
 ;;;; RESET-GAME function
 
 (defun reset-game ()
+  (setf *player-missiles* nil)
+  (setf *player-missiles-explosion* nil)
+  (setf *enemy-missiles* nil)
+  (setf *enemies* nil)
   (create-enemies-attack-schedule)
   (setf *game-clock* 0)
   (setf *player-missile-count* 50)
-  (setf *player-score* 0))
+  (setf *player-score* 0)
+  (setf *level* 1)
+  (setf *wave* 1))
+
 
 ;;;; INITIALIZE-GAME function
 
 (defun initialize-game ()
-  (setf *game-state* 0)
-  (setf *player-missiles* nil)
-  (setf *player-missiles-explosion* nil)
-  (setf *enemy-missiles* nil)
-  (setf *enemies* nil))
+  (setf *game-state* 0))
 
 
 ;;;; SETUP-AUDIO function
@@ -579,10 +644,11 @@
       (:key-up-event (:key key)
 		     (case key))
       (:mouse-button-down-event (:x x :y y)
-				(cond ((sdl:mouse-left-p) 
-				       (fire-primary x y))
-				      ((sdl:mouse-right-p)
-				       (format t "right button: ~ax~a~%" x y))))
+				(if (= *game-state* 1)
+				    (cond ((sdl:mouse-left-p) 
+					   (fire-primary x y))
+					  ((sdl:mouse-right-p)
+					   (format t "right button: ~ax~a~%" x y)))))
       (:idle ()
 	     ;(when (sdl:get-key-state :sdl-key-up) (move-player 'player 'up))
 	     ;(when (sdl:get-key-state :sdl-key-down) (move-player 'player 'down))
