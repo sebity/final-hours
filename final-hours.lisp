@@ -297,7 +297,8 @@
   (loop for e in *enemy-missiles-explosion*
      do (if (>= (missile-explosion-r e) (missile-explosion-rt e))
 	    (progn (setf *enemy-missiles-explosion* (remove e *enemy-missiles-explosion*))
-		   (setf *damage* (+ *damage* (+ (random 5) 20))))
+		   (setf *damage* (+ *damage* (+ (random 5) 20)))
+		   (play-sound 9))
 	    (progn (setf (missile-explosion-r e) (+ (missile-explosion-r e) (/ 1 2)))
 		   (destroy-enemy-missiles (missile-explosion-x e) (missile-explosion-y e)
 					   (missile-explosion-r e))))))
@@ -598,7 +599,7 @@
 ;;;; SETUP-AUDIO function
 
 (defun setup-audio ()
-  (setf *soundfx* (make-array 9))
+  (setf *soundfx* (make-array 10))
   (sdl-mixer:init-mixer :mp3)
   (setf *mixer-opened* (sdl-mixer:OPEN-AUDIO :chunksize 1024 :enable-callbacks nil))
   (when *mixer-opened*
@@ -611,6 +612,7 @@
     (setf (aref *soundfx* 6) (sdl-mixer:load-sample (sdl:create-path "missile_1.ogg" *audio-root*)))
     (setf (aref *soundfx* 7) (sdl-mixer:load-sample (sdl:create-path "missile_2.ogg" *audio-root*)))
     (setf (aref *soundfx* 8) (sdl-mixer:load-sample (sdl:create-path "missile_3.ogg" *audio-root*)))
+    (setf (aref *soundfx* 9) (sdl-mixer:load-sample (sdl:create-path "air_raid_siren.ogg" *audio-root*)))
     (setf *music* (sdl-mixer:load-music (sdl:create-path "siren_1.ogg" *audio-root*)))
     (setf *music-intro* (sdl-mixer:load-music (sdl:create-path "heart_1.ogg" *audio-root*)))
     (sample-finished-action)
