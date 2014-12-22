@@ -24,6 +24,7 @@
 
 (defparameter *level* 1)
 (defparameter *wave* 1)
+(defparameter *damage* 0)
 
 (defparameter *game-clock* 0)
 
@@ -397,7 +398,7 @@
 ;;;; FIRE-PRIMARY function
 
 (defun fire-primary (x y)
-  (unless (zerop *player-missile-count*)
+  (unless (or (zerop *player-missile-count*) (> y 500))
     (let ((d (- x (/ *game-width* 2)))
 	  (dx 0))
       (if (zerop d)
@@ -410,7 +411,7 @@
 	     :x1 (/ *game-width* 2) :y1 (- *game-height* 25)
 	     :dx dx :dy -4 :active 1)
 	    *player-missiles*))
-
+    
     (play-sound-missile)
     (setf *player-missile-count* (decf *player-missile-count*))))
 
@@ -550,7 +551,7 @@
   (setf *enemies* nil)
   (create-enemies-attack-schedule)
   (setf *game-clock* 0)
-  (setf *player-missile-count* 50)
+  (setf *player-missile-count* 30)
   (setf *player-score* 0)
   (setf *level* 1)
   (setf *wave* 1))
