@@ -1,9 +1,9 @@
 ;;;; final-hours.asd
 
 (asdf:defsystem #:final-hours
-  :description "Describe final-hours here"
-  :author "Your Name <your.name@example.com>"
-  :license "Specify license here"
+  :description "A Remake of the Classic Game Missile Command"
+  :author "Jan Tatham <jan@sebity.com>"
+  :license "GPL v2"
   :depends-on (#:lispbuilder-sdl
                #:lispbuilder-sdl-ttf
                #:lispbuilder-sdl-mixer)
