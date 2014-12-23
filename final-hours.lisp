@@ -36,6 +36,8 @@
 
 ;;;; GFX Params
 (defparameter *gfx-night-bg* (merge-pathnames "night_bg.png" *gfx-root*))
+(defparameter *gfx-intro-bg* (merge-pathnames "intro_bg.png" *gfx-root*))
+(defparameter *gfx-game-over-bg* (merge-pathnames "game_over_bg.png" *gfx-root*))
 
 ;;;; Font Params
 (defparameter *terminus-ttf-12* 
@@ -522,13 +524,18 @@
 ;;;; NEW-LEVEL function
 
 (defun new-level ()
-  (setf *player-score* (+ *player-score* (* 5 *player-missile-count*) (* 1000 *level*)))
+  (setf *player-score* (+ *player-score* 
+			  (* 5 *player-missile-count*) 
+			  (* 1000 *level*)
+			  (* (- 100 *damage*) *level*)))
   (create-enemies-attack-schedule)
   (setf *game-clock* 0)
   (setf *wave* 1)
   (setf *damage* (- *damage* 20))
   (if (< *damage* 0)
       (setf *damage* 0))
+  (if (zerop (mod *level* 5))
+      (setf *enemy-missile-count* (+ *enemy-missile-count* 2)))
   (setf *player-missile-count* (+ *player-missile-count* 30))
   (setf *level* (incf *level*)))
 
@@ -536,7 +543,9 @@
 ;;;; NEW-WAVE function
 
 (defun new-wave ()
-  (+ *player-score* (* 5 *player-missile-count*))
+  (setf *player-score* (+ *player-score* 
+			  (* 5 *player-missile-count*) 
+			  (* 100 *level*)))
   (setf *game-clock* 0)
   (create-enemies-attack-schedule)
   (setf *wave* (incf *wave*))
@@ -561,23 +570,20 @@
 ;;;; DISPLAY-END-GAME function
 
 (defun display-end-game ()
-  ;(sdl:draw-surface-at-* (sdl:load-image *gfx-game-over*) 0 0)
-
-  (draw-text "FINAL HOURS" 320 20 255 255 0 *ttf-font-huge*)
-
-  (draw-text "GAME OVER!" 320 130 255 255 255 *ttf-font-huge*)
+  (sdl:draw-surface-at-* (sdl:load-image *gfx-game-over-bg*) 0 0)
 
   (draw-text (format nil "YOUR SCORE IS ~a" *player-score*) 
-			     260 250 255 0 0 *ttf-font-huge*)
+			     270 300 255 255 255 *ttf-font-huge*)
 
-  (draw-text "Press SPACE to Continue..." 270 560 255 255 255))
+  (draw-text "Press SPACE to Continue..." 290 570 255 255 255))
 
 
 ;;;; DISPLAY-MENU function
 
 (defun display-menu ()
-  (draw-text "FINAL HOURS" 320 20 255 255 0 *ttf-font-huge*)
-  (draw-text "Press SPACE to Start..." 270 560 255 255 255))
+  (sdl:draw-surface-at-* (sdl:load-image *gfx-intro-bg*) 0 0)
+  ;(draw-text "FINAL HOURS" 320 20 255 255 0 *ttf-font-huge*)
+  (draw-text "Press SPACE to Start..." 290 570 255 255 255))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; GAME STATE ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -585,16 +591,16 @@
 ;;;; STATE-IN-PLAY function
 
 (defun state-in-play ()
-  (update-game-clock)
-  (display-level)
-
+  
   (unless (eql *pause* t)
+    (update-game-clock)
     (update-player-missiles)
     (update-enemy-missiles)
     (check-end-of-wave)
     (check-damage-level)
     (create-enemies))
 
+  (display-level)
   (draw-player)
   (draw-player-missiles)
   (draw-player-missiles-explosion)
@@ -656,6 +662,7 @@
 ;;;; RESET-GAME function
 
 (defun reset-game ()
+  (setf *random-state* (make-random-state t))
   (setf *player-missile-count* 30)
   (setf *player-missiles* nil)
   (setf *player-missiles-explosion* nil)
@@ -781,7 +788,7 @@
       (:key-up-event (:key key)
 		     (case key))
       (:mouse-button-down-event (:x x :y y)
-				(if (= *game-state* 1)
+				(if (and (= *game-state* 1) (eql *pause* nil))
 				    (cond ((sdl:mouse-left-p) 
 					   (fire-primary x y))
 					  ((sdl:mouse-right-p)
