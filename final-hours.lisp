@@ -25,8 +25,8 @@
 (defparameter *level* 1)
 (defparameter *wave* 1)
 (defparameter *damage* 0)
-
 (defparameter *game-clock* 0)
+(defparameter *pause* nil)
 
 ;;;; Sound Params
 (defparameter *mixer-opened* nil)
@@ -72,8 +72,7 @@
   (x1 0)
   (y1 0)
   (dx 0)
-  (dy 0)
-  (active 0))
+  (dy 0))
 
 
 (defstruct missile-explosion
@@ -81,8 +80,7 @@
   (y 0)
   (r 0)
   (rt 0)
-  (dr 0)
-  (active 0))
+  (dr 0))
 
 
 (defstruct enemy-missile
@@ -94,7 +92,8 @@
   (y1 0)
   (dx 0)
   (dy 0)
-  (active 0))
+  (smart 0))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; SLIME ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -221,6 +220,8 @@
   (draw-polygon '((0 520) (20 520) (70 540) (80 540) (160 480) (220 520) (280 520) (330 530) (340 530) (360 480) (380 520) (400 520) (480 460) (520 500) (540 500) (580 500) (600 540) (620 540) (680 500) (760 500) (800 520) (800 600) (0 600)) 0 0 0))
 
 
+;;;; DRAW-GAME-UI function
+
 (defun draw-game-ui ()
   (if (<= *game-clock* (* 60 2))
       (progn (draw-text (format nil "Level ~a" *level*)
@@ -235,7 +236,11 @@
 	     380 580 255 255 255 *ttf-font-small*)
 
   (draw-text (format nil "Missiles: ~a" *player-missile-count*) 
-	     700 580 255 255 255 *ttf-font-small*))
+	     700 580 255 255 255 *ttf-font-small*)
+
+  (if (eql *pause* t)
+      (draw-text "Paused" 
+	     380 280 255 255 255 *ttf-font-large*)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; ENEMY ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -248,11 +253,60 @@
      do (push (random (* 60 60)) *enemies*)))
 
 
+;;;; CREATE-ENEMIES function
+
 (defun create-enemies ()
   (loop for e in *enemies*
      do (if (<= e *game-clock*)
 	    (progn (create-enemy-missiles)
 		   (setf *enemies* (remove e *enemies*))))))
+
+
+;;;; ACTIVATE-SMART-MISSILE function
+
+(defun activate-smart-missile (m)
+  (let* ((x0 (enemy-missile-x1 m))
+	 (y0 (enemy-missile-y1 m))
+	 (xt (enemy-missile-xt m))
+	 (d 0)
+	 (dx 0))
+    
+    ; left missile
+    (setf d (- (- xt x0) (+ (random 50) 50)))
+    (if (< d 10)
+	(setf d 10))
+
+    (if (zerop d)
+	(setf dx 0)
+	(setf dx (/ 1 (/ (- 500 y0) d))))
+
+    (push (make-enemy-missile
+	   :xt xt :yt 500
+	   :x0 x0 :y0 y0	
+	   :x1 x0 :y1 y0
+	   :dx dx :dy 1
+	   :smart 0)
+	  *enemy-missiles*)
+
+
+    ; right missile
+    (setf d (+ (- xt x0) (+ (random 50) 50)))
+    (if (> d 790)
+	(setf d 790))
+
+    (if (zerop d)
+	(setf dx 0)
+	(setf dx (/ 1 (/ (- 500 y0) d))))
+
+    (push (make-enemy-missile
+	   :xt xt :yt 500
+	   :x0 x0 :y0 y0	
+	   :x1 x0 :y1 y0
+	   :dx dx :dy 1
+	   :smart 0)
+	  *enemy-missiles*))
+
+  (setf (enemy-missile-smart m) 0))
 
 
 ;;;; CREATE-ENEMY-MISSILES function
@@ -261,19 +315,23 @@
   (let* ((xt (+ (random 780) 10))
 	 (x0 (+ (random 700) 50))
 	 (d (- xt x0))
-	 (dx 0))
+	 (dx 0)
+	 (smart 0))
 
     (if (zerop d)
 	(setf dx 0)
 	(setf dx (/ 1 (/ 500 d))))
 
-	;(setf dx (/ 1 (/ (- y *game-height*) d))))
+    (if (>= *level* 3)
+	(if (<= (+ (random 100)) (* 3 *level*))
+	    (setf smart 1)))
 
     (push (make-enemy-missile
 	   :xt xt :yt 500
 	   :x0 x0 :y0 0	
 	   :x1 x0 :y1 0
-	   :dx dx :dy 1 :active 1)
+	   :dx dx :dy 1
+	   :smart smart)
 	  *enemy-missiles*)))
 
 
@@ -286,7 +344,10 @@
 		   (create-enemy-explosion (enemy-missile-xt m) (enemy-missile-yt m))
 		   (play-sound-explosion))
 	    (progn (setf (enemy-missile-x1 m) (+ (enemy-missile-x1 m) (enemy-missile-dx m)))
-		   (setf (enemy-missile-y1 m) (+ (enemy-missile-y1 m) (enemy-missile-dy m))))))
+		   (setf (enemy-missile-y1 m) (+ (enemy-missile-y1 m) (enemy-missile-dy m)))
+		   (if (and (= (enemy-missile-smart m) 1)
+			    (> (enemy-missile-y1 m) (+ (random 100) 100)))
+		       (activate-smart-missile m)))))
 
   (update-enemy-missiles-explosion))
 
@@ -327,7 +388,7 @@
 
 (defun create-enemy-explosion (x y)
   (push (make-missile-explosion
-	 :x x :y y :r 1 :rt 40 :dr 1 :active 1) *enemy-missiles-explosion*))
+	 :x x :y y :r 1 :rt 40 :dr 1) *enemy-missiles-explosion*))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; PLAYER ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -412,7 +473,7 @@
 	     :xt x :yt y
 	     :x0 (/ *game-width* 2) :y0 (- *game-height* 25)	
 	     :x1 (/ *game-width* 2) :y1 (- *game-height* 25)
-	     :dx dx :dy -4 :active 1)
+	     :dx dx :dy -4)
 	    *player-missiles*))
     
     (play-sound-missile)
@@ -423,14 +484,17 @@
 
 (defun create-explosion (x y)
   (push (make-missile-explosion
-	 :x x :y y :r 1 :rt 40 :dr 1 :active 1) *player-missiles-explosion*))
+	 :x x :y y :r 1 :rt 40 :dr 1) *player-missiles-explosion*))
 
 ;;;;;;;;;;;;;;;;;;;;;;;; IN GAME ;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;; UPDATE-GAME-CLOCK function
 
 (defun update-game-clock ()
   (setf *game-clock* (incf *game-clock*)))
 
+
+;;;; CHECK-END-OF-WAVE function
 
 (defun check-end-of-wave ()
   (if (> *game-clock* (* 60 70))
@@ -439,15 +503,26 @@
 	      (new-level)
 	      (new-wave)))))
 
+
+;;;; CHECK-DAMAGE-LEVEL function
+
 (defun check-damage-level ()
   (if (>= *damage* 100)
       (change-game-state)))
+
+
+;;;; PAUSE-GAME function
+
+(defun pause-game ()
+  (if (eql *pause* nil)
+      (setf *pause* t)
+      (setf *pause* nil)))
 
 	   
 ;;;; NEW-LEVEL function
 
 (defun new-level ()
-  (setf *player-score* (+ *player-score* (* 5 *player-missile-count*)))
+  (setf *player-score* (+ *player-score* (* 5 *player-missile-count*) (* 1000 *level*)))
   (create-enemies-attack-schedule)
   (setf *game-clock* 0)
   (setf *wave* 1)
@@ -461,6 +536,7 @@
 ;;;; NEW-WAVE function
 
 (defun new-wave ()
+  (+ *player-score* (* 5 *player-missile-count*))
   (setf *game-clock* 0)
   (create-enemies-attack-schedule)
   (setf *wave* (incf *wave*))
@@ -511,18 +587,22 @@
 (defun state-in-play ()
   (update-game-clock)
   (display-level)
+
+  (unless (eql *pause* t)
+    (update-player-missiles)
+    (update-enemy-missiles)
+    (check-end-of-wave)
+    (check-damage-level)
+    (create-enemies))
+
   (draw-player)
-  (update-player-missiles)
-  (update-enemy-missiles)
   (draw-player-missiles)
   (draw-player-missiles-explosion)
   (draw-enemy-missiles)
   (draw-enemy-missiles-explosion)
   (draw-mountains)
-  (draw-game-ui)
-  (check-end-of-wave)
-  (check-damage-level)
-  (create-enemies))
+  (draw-game-ui))
+
 
 
 ;;;; CONTINUE-OPTION function
@@ -576,18 +656,20 @@
 ;;;; RESET-GAME function
 
 (defun reset-game ()
+  (setf *player-missile-count* 30)
   (setf *player-missiles* nil)
   (setf *player-missiles-explosion* nil)
+  (setf *enemy-missile-count* 10)
   (setf *enemy-missiles* nil)
   (setf *enemy-missiles-explosion* nil)
   (setf *enemies* nil)
   (create-enemies-attack-schedule)
   (setf *game-clock* 0)
-  (setf *player-missile-count* 30)
   (setf *player-score* 0)
   (setf *level* 1)
   (setf *wave* 1)
-  (setf *damage* 0))
+  (setf *damage* 0)
+  (setf *pause* nil))
 
 
 ;;;; INITIALIZE-GAME function
@@ -690,6 +772,8 @@
 		   t)
       (:key-down-event (:key key)
 		       (case key
+			 (:sdl-key-p (if (= *game-state* 1)
+					 (pause-game)))
 			 (:sdl-key-q (if (= *game-state* 1)
 					 (change-game-state)))
 			 (:sdl-key-space (continue-option))
