@@ -13,7 +13,7 @@ To run this game place the files somewhere [Quicklisp](http://www.quicklisp.org/
 
 ```lisp
 (ql:quickload :final-hours)
-(breakout:start)
+(final-hours:start)
 ```
 
 ## Controls
