@@ -2,7 +2,7 @@
 
 (in-package #:final-hours)
 
-(defparameter *data-root* "src/lisp/final-hours/")
+(defparameter *data-root* (asdf:system-source-directory 'final-hours))
 (defparameter *font-root* (merge-pathnames "fonts/" *data-root*))
 (defparameter *audio-root* (merge-pathnames "audio/" *data-root*))
 (defparameter *gfx-root* (merge-pathnames "gfx/" *data-root*))
