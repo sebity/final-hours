@@ -10,7 +10,7 @@
 ;;;; Game Params
 (defparameter *game-width* 800)
 (defparameter *game-height* 600)
-(defparameter *game-state* 0) ; 0=menu, 1:ready, 2:in-game, 3:win-lose
+(defparameter *game-state* 0)
 
 (defparameter *player-missiles* nil)
 (defparameter *player-missiles-explosion* nil)
@@ -95,7 +95,6 @@
   (dx 0)
   (dy 0)
   (smart 0))
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; SLIME ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -252,7 +251,7 @@
 
 (defun create-enemies-attack-schedule ()
   (loop for x below *enemy-missile-count*
-     do (push (random (* 60 60)) *enemies*)))
+     do (push (random (* 60 45)) *enemies*)))
 
 
 ;;;; CREATE-ENEMIES function
@@ -499,7 +498,7 @@
 ;;;; CHECK-END-OF-WAVE function
 
 (defun check-end-of-wave ()
-  (if (> *game-clock* (* 60 70))
+  (if (> *game-clock* (* 60 55))
       (if (and (eql *enemy-missiles-explosion* nil) (eql *enemy-missiles* nil))
 	  (if (= *wave* 3)
 	      (new-level)
@@ -582,7 +581,6 @@
 
 (defun display-menu ()
   (sdl:draw-surface-at-* (sdl:load-image *gfx-intro-bg*) 0 0)
-  ;(draw-text "FINAL HOURS" 320 20 255 255 0 *ttf-font-huge*)
   (draw-text "Press SPACE to Start..." 290 570 255 255 255))
 
 
@@ -794,6 +792,4 @@
 					  ((sdl:mouse-right-p)
 					   (format t "right button: ~ax~a~%" x y)))))
       (:idle ()
-	     ;(when (sdl:get-key-state :sdl-key-up) (move-player 'player 'up))
-	     ;(when (sdl:get-key-state :sdl-key-down) (move-player 'player 'down))
 	     (render)))))
